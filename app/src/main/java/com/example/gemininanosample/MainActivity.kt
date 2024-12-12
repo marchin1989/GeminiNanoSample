@@ -11,7 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
@@ -49,7 +49,6 @@ import com.google.ai.edge.aicore.GenerateContentResponse
 import com.google.ai.edge.aicore.GenerativeAIException
 import com.google.ai.edge.aicore.GenerativeModel
 import com.google.ai.edge.aicore.asTextOrNull
-import com.google.ai.edge.aicore.content
 import com.google.ai.edge.aicore.generationConfig
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
@@ -65,7 +64,6 @@ class MainActivity : ComponentActivity() {
             GeminiNanoSampleTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        name = "Android",
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -146,8 +144,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private suspend fun generateContentStream(input: String) {
-        Log.d(TAG, "Start Stream generating. input text: $input")
-        generativeModel.generateContentStream(input)
+        val prompt = """
+            I want you to act as an English proofreader.
+            I will provide you with texts to review for any spelling, grammar, or punctuation errors.
+            Please provide only the corrected version of the text, without any additional explanations or comments.
+            The previous version of text: $input
+            The corrected version of the text:
+            """.trimIndent()
+
+        Log.d(TAG, "Start Stream generating. prompt: $prompt")
+        generativeModel.generateContentStream(prompt)
             .onCompletion {
                 viewModel.updateIsGenerating(false)
             }
@@ -188,16 +194,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Greeting(
-    name: String,
     modifier: Modifier = Modifier,
     mainViewModel: MainViewModel = viewModel(),
 ) {
     val generatedText by mainViewModel.generatedText.collectAsState()
     val isGenerating by mainViewModel.isGenerating.collectAsState()
     val context = LocalContext.current
-    var inputText by remember { mutableStateOf("日本の歴代首相は？") }
+    var inputText by remember { mutableStateOf("These arent the droids your looking for.") }
+    val focusManager = LocalFocusManager.current
+
     LazyColumn(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
@@ -208,7 +215,7 @@ fun Greeting(
                 )
             )
             Text(
-                text = "文章を入力してください",
+                text = "英文を入力してください",
             )
             TextField(
                 value = inputText,
@@ -220,15 +227,16 @@ fun Greeting(
                 onClick = {
                     mainViewModel.updateInputText(inputText)
                     mainViewModel.updateIsGenerating(true)
+                    focusManager.clearFocus()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isGenerating
             ) {
-                Text("生成する")
+                Text("校正する")
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("回答")
+                Text("校正した文")
                 IconButton(onClick = {
                     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     val clipData = ClipData.newPlainText("proofread_text", generatedText)
@@ -255,6 +263,6 @@ fun Greeting(
 @Composable
 fun GreetingPreview() {
     GeminiNanoSampleTheme {
-        Greeting("Android")
+        Greeting()
     }
 }
